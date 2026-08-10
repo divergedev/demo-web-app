@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bank Demo Dashboard</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #121212; color: #fff; margin: 0; padding: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: #1e1e1e; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        h1, h2 { color: #bb86fc; }
+        .input-group { margin-bottom: 20px; }
+        input { background: #333; border: 1px solid #555; color: #fff; padding: 10px; border-radius: 4px; width: 300px; }
+        button { background: #bb86fc; color: #000; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #a370e0; }
+        .topology { display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; }
+        .node { background: #333; padding: 15px; border-radius: 8px; flex: 1; text-align: center; border: 2px solid transparent; }
+        .node.preview { border-color: #03dac6; background: #1a3330; }
+        .node-title { font-weight: bold; margin-bottom: 5px; }
+        .node-version { font-size: 0.8em; color: #aaa; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #333; }
+        th { color: #aaa; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Bank Dashboard</h1>
+        <div class="card">
+            <h2>Preview Environment</h2>
+            <div class="input-group">
+                <label for="preview-id">x-preview-id:</label><br><br>
+                <input type="text" id="preview-id" placeholder="Enter preview ID">
+                <button onclick="fetchData()">Refresh</button>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Topology</h2>
+            <div class="topology" id="topology-nodes">
+                <div class="node" id="node-web"><div class="node-title">web-app</div><div class="node-version">loading...</div></div>
+                <div class="node" id="node-gateway"><div class="node-title">gateway</div><div class="node-version">loading...</div></div>
+                <div class="node" id="node-payments"><div class="node-title">payments-api</div><div class="node-version">loading...</div></div>
+                <div class="node" id="node-accounts"><div class="node-title">accounts-api</div><div class="node-version">loading...</div></div>
+            </div>
+        </div>
+        <div class="card">
+            <h2>Account Balance</h2>
+            <h1 id="balance-amount">$--.--</h1>
+        </div>
+        <div class="card">
+            <h2>Recent Payments</h2>
+            <table>
+                <thead><tr><th>ID</th><th>Amount</th><th>Status</th></tr></thead>
+                <tbody id="payments-list"><tr><td colspan="3">Loading...</td></tr></tbody>
+            </table>
+        </div>
+    </div>
+    <script>
+        async function fetchWithHeader(url, previewId) {
+            const headers = {};
+            if (previewId) headers["x-preview-id"] = previewId;
+            return fetch(url, { headers }).then(r => r.json());
+        }
+        async function fetchData() {
+            const previewId = document.getElementById("preview-id").value;
+            fetchWithHeader("/health", previewId).then(data => updateNode("web", data.version)).catch(e => console.error(e));
+            fetchWithHeader("/api/accounts", previewId).then(data => {
+                if(data.balance) document.getElementById("balance-amount").innerText = "$" + data.balance;
+                updateNode("accounts", data.version);
+            }).catch(e => console.error(e));
+            fetchWithHeader("/api/payments", previewId).then(data => {
+                updateNode("payments", data.version);
+                if(data.balance && data.balance !== "unavailable") {
+                    try { const b = JSON.parse(data.balance); updateNode("accounts", b.version); } catch(e) {}
+                }
+                if(data.payments) {
+                    const tbody = document.getElementById("payments-list");
+                    tbody.innerHTML = "";
+                    data.payments.forEach(p => {
+                        tbody.innerHTML += `<tr><td>${p.id}</td><td>$${p.amount}</td><td>${p.status}</td></tr>`;
+                    });
+                }
+            }).catch(e => console.error(e));
+        }
+        function updateNode(name, version) {
+            const node = document.getElementById(`node-${name}`);
+            if(node) {
+                node.querySelector(".node-version").innerText = version || "baseline";
+                if(version && version !== "baseline") node.classList.add("preview");
+                else node.classList.remove("preview");
+            }
+        }
+        fetchData();
+    </script>
+</body>
+</html>
