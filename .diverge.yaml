@@ -1,14 +1,26 @@
-apiVersion: diverge.io/v1alpha1
-kind: ServicePreview
-metadata:
-  name: web-app
-spec:
-  namespace: demo-bank
-  serviceName: web-app
-  port: 8080
+# yaml-language-server: $schema=https://divergedev.com/schemas/diverge.schema.json
+version: "1"
+
+services:
+  web-app:
+    paths:
+      - "**/*.go"
+      - "index.html"
+      - "Dockerfile"
+      - "deploy/**"
+    image:
+      repository: ghcr.io/divergedev/demo-web-app
+      tag_template: "pr-{{.PR}}"
+    entrypoint: true
+
+defaults:
+  deploy:
+    mode: delta
+    namespace: same
   routing:
-    headerKey: x-preview-id
-  container:
-    env:
-      - name: GATEWAY_URL
-        value: http://gateway:8080
+    mode: header
+    baseline_namespace: demo-bank
+    header_key: x-preview-id
+  lifecycle:
+    ttl: 24h
+    cleanup_on_merge: true
